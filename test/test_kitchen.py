@@ -1,13 +1,15 @@
 from pybullet_suite import *
+from tree4tamp import *
 
-world = BulletWorld(gui=True)
+#world = BulletWorld(gui=True)
+#panda = world.load_robot(Panda, "panda")
 
-panda = world.load_robot(Panda, "panda")
+#
+
+dom = DomainKitchen(gui=True, num_box=5)
+prob = ProblemKitchen(dom)
 
 input()
-#from tree4tamp import *
-
-# dom = DomainKitchen(gui=True, num_box=5)
 # problem = ProblemKitchen(dom)
 # dom.domain_pddl_path
 # problem.make_temp_pddl_files()

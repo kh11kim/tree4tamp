@@ -111,11 +111,11 @@ class Mode:
     """ All attachments of movables"""
     def __init__(self, atts: Dict[str, Attachment]):
         self.attachments: Dict[str, Attachment] = atts
-        self.mode_key: Dict[str, Tuple[str, np.ndarray]] = self.get_mode_key(atts)
+        #self.mode_key: Dict[str, Tuple[str, np.ndarray]] = self.get_mode_key(atts)
 
     def set_attachment(self, att:Attachment):
         self.attachments[att.obj_name] = att
-        self.mode_key = self.get_mode_key(self.attachments)
+        #self.mode_key = self.get_mode_key(self.attachments)
 
     def __repr__(self):
         s = "_".join([obj+"-"+key[0] for obj, key in self.mode_key.items()])
@@ -172,6 +172,7 @@ class TAMPObject(Body):
         super().__init__(
             physics_client,
             body_uid,
+            name=name
         )
         self.name = name
         self.is_movable = None

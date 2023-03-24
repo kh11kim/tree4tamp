@@ -154,8 +154,8 @@ class DomainKitchen(TAMPDomain):
 
 
 class ProblemKitchen(TAMPProblem):
-    def __init__(self, domain: DomainKitchen, num_block=2, cooked_list=None):
-        self.num_block = num_block
+    def __init__(self, domain: DomainKitchen, cooked_list=None):
+        self.num_block = domain.num_box
         self.cooked_list = cooked_list
         super().__init__(
             prob_name="kitchen_prob1",
@@ -202,7 +202,7 @@ class ProblemKitchen(TAMPProblem):
         att_list = []
         for movable_name, movable in self.domain.movables.items():
             sop = movable.sops[0]
-            placement = self.domain.get_current_placement(movable_name, parent_obj, sop)
+            placement = self.domain.get_current_placement_from_scene(movable_name, parent_obj, sop)
             att_list.append(placement)
         self.mode_init = Mode.from_list(att_list)
         
@@ -211,7 +211,7 @@ class ProblemKitchen(TAMPProblem):
         for robot_name, robot in self.domain.robots.items():
             q[robot_name] = robot.get_joint_angles()
         self.config_init = Config(q)
-        self.domain.assign(self.mode_init, self.config_init)
+        self.domain.geometry_assign(self.mode_init, self.config_init)
 
 if __name__ == "__main__":
     dom = DomainKitchen(gui=True, num_box=5)

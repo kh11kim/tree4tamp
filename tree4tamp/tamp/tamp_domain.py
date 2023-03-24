@@ -26,7 +26,7 @@ class TAMPDomain:
         # self.hand = Gripper(self.world, self.sm)
         self.init_state = None
         movables, regions, robots, envs = self.set_task_scene()
-        self.init_state = self.save()
+        #self.init_state = self.save()
         self.set_tamp_objects(movables, regions, robots)
                 
         # with open(self.domain_pddl_path, "r") as f:
@@ -102,13 +102,15 @@ class TAMPDomain:
     def mode_assign(self, mode:Mode):
         def has_cycle(parents):
             visited = set()
-            def dfs(node, parent):
+            def dfs(node):
+                if node in visited: return True
+                
+                if node not in parents.keys(): return False
                 visited.add(node)
                 parent = parents[node]
-                if parent in visited:
-                    return True
-                if parent is not None:
-                    return dfs(parent)
+                # if parent in visited:
+                #     return True
+                if parent is not None: return dfs(parent)
                 return False
 
             for node in parents.keys():
@@ -128,7 +130,7 @@ class TAMPDomain:
         assigned = []
         for obj, att in mode.attachments.items():
             if obj not in assigned:
-                self.assign_obj(obj, parents, mode.attachments, assigned, 0)
+                self.assign_obj(obj, parents, mode.attachments, assigned)
 
     def geometry_assign(self, mode:Mode, config:Optional[Config]=None):
         self.mode_assign(mode)
@@ -280,20 +282,20 @@ class TAMPDomain:
         else:
             return sample_placement(obj_name, parent_name)
     
-    # def get_current_placement_from_scene(self, obj_name: str, parent_name: str, sop:SOP):
-    #     movable: Movable = self.objects[obj_name]
-    #     placeable: TAMPObject = self.objects[parent_name]
+    def get_current_placement_from_scene(self, obj_name: str, parent_name: str, sop:SOP):
+        movable: Movable = self.objects[obj_name]
+        placeable: TAMPObject = self.objects[parent_name]
         
-    #     point = movable.get_base_pose().trans
-    #     z = placeable.get_base_pose().trans[-1] + placeable.sssp.upper[-1]
-    #     point[-1] = z
-    #     placement = Placement.from_point_and_sop(
-    #         obj_name, parent_name, 
-    #         placeable.get_base_pose(),
-    #         point, sop, yaw=0
-    #     )
-    #     #placement.assigned_tf = placeable.get_base_pose() * placement.tf.inverse()
-    #     return placement
+        point = movable.get_base_pose().trans
+        z = placeable.get_base_pose().trans[-1] + placeable.sssp.upper[-1]
+        point[-1] = z
+        placement = Placement.from_point_and_sop(
+            obj_name, parent_name, 
+            placeable.get_base_pose(),
+            point, sop, yaw=0
+        )
+        #placement.assigned_tf = placeable.get_base_pose() * placement.tf.inverse()
+        return placement
 
     def sample_attachment_by_action(self, action:Attach):
         return self.sample_attachment(action.target_obj_name, action.parent_to)
