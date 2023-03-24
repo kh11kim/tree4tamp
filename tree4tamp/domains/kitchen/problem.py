@@ -156,7 +156,11 @@ class DomainKitchen(TAMPDomain):
 class ProblemKitchen(TAMPProblem):
     def __init__(self, domain: DomainKitchen, cooked_list=None):
         self.num_block = domain.num_box
-        self.cooked_list = cooked_list
+        if cooked_list == "all":
+            self.cooked_list = [*domain.movables.keys()]
+        else:
+            assert type(cooked_list) == list
+            self.cooked_list = cooked_list
         super().__init__(
             prob_name="kitchen_prob1",
             domain=domain
@@ -187,9 +191,9 @@ class ProblemKitchen(TAMPProblem):
             cooked = [("cooked", box) for box in self.objects["food"]]
         else:
             cooked = []
-            for cooked_box_num in self.cooked_list:
-                assert f"box{cooked_box_num}" in self.objects["food"]
-                cooked.append(("cooked", f"box{cooked_box_num}"))
+            for cooked_box in self.cooked_list:
+                assert cooked_box in self.objects["food"]
+                cooked.append(("cooked", cooked_box))
         self.goal = [ #and
             *cooked,
             *hand_clean

@@ -7,7 +7,7 @@ from tree4tamp import *
 #
 
 dom = DomainKitchen(gui=True, num_box=5)
-prob = ProblemKitchen(dom)
+prob = ProblemKitchen(dom, cooked_list="all")
 
 input()
 # problem = ProblemKitchen(dom)
