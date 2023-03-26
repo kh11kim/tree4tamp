@@ -1,5 +1,6 @@
 from pybullet_suite import *
 from tree4tamp import *
+from pyperplan import *
 
 #world = BulletWorld(gui=True)
 #panda = world.load_robot(Panda, "panda")

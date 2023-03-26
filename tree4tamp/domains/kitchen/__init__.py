@@ -1,1 +1,2 @@
-from tree4tamp.domains.kitchen.problem import *
+from .problem import *
+#from .scene import *

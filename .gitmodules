@@ -1,0 +1,3 @@
+[submodule "pyperplan"]
+	path = pyperplan
+	url = https://github.com/kh11kim/pyperplan.git
