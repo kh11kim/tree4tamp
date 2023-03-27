@@ -103,12 +103,12 @@ class ProblemKitchen(TAMPProblem):
             # set robot
             self.robots = {"robot":self.world.load_robot(name="robot", robot_class=Panda)}
             self.object_types = {
-                "robot": "robot",
-                "sink1": "sink",
-                "dish1": "dish",
-                "oven1": "oven",
-            }
-            self.object_types.update({name:"food" for name in self.movables.keys()})
+                "robot": ["robot"],
+                "sink": ["sink1"],
+                "dish": ["dish1"],
+                "oven": ["oven1"],
+                "food": list(self.movables.keys()),
+            }            
         self.world.set_view(eye_point=[1.2,-0.2,0.7])
         self.world.wait_for_rest()
 
@@ -167,8 +167,7 @@ class ProblemKitchen(TAMPProblem):
 
     def set_init_goal(self):
         # set by parent class
-        foods = [name for name, obj_type in self.object_types.items()\
-                 if obj_type == "food"]
+        foods = list(self.movables.keys())
         #hand_clean = [("clear", box) for box in foods]
         hand_clean = [("handempty")]
         attached_dish = [("attached", box, "dish1") for box in foods]
@@ -189,6 +188,8 @@ class ProblemKitchen(TAMPProblem):
             *hand_clean
         ]
         self.mode_goal = {}
+
+    
 
 # class ProblemKitchen(TAMPProblem):
 #     def __init__(self, domain: DomainKitchen, cooked_list=None):

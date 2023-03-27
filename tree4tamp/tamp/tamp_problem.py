@@ -62,15 +62,18 @@ class TAMPProblem:
     def set_task_scene(self):
         # this should save self.init_state
         # this should output movables, regions, robots
-        raise NotImplementedError()
+        #raise NotImplementedError()
+        pass
     
     def set_tamp_object_config(self):
-        raise NotImplementedError()
+        #raise NotImplementedError()
+        pass
 
     def set_init_goal(self):
         self.init = None
         self.goal = None
-        raise NotImplementedError()
+        #raise NotImplementedError()
+        pass
     
 
 
@@ -311,6 +314,32 @@ class TAMPProblem:
         else:
             raise ValueError("There is no placement to placement action")
     
+    def generate_pddl_problem_as_string(self):
+        def addline(pddl, fact):
+            if isinstance(fact, str):
+                pddl += f"    ({fact})\n"
+            if isinstance(fact, tuple):
+                pddl += f"    ({' '.join(fact)})\n"
+            return pddl
+        
+        # Generate the PDDL problem file as a string
+        pddl = f"(define (problem {self.domain_name}_PROB1)\n"
+        pddl += f"  (:domain {self.domain_name})\n"
+        pddl += "  (:objects\n"
+        for obj_type, obj in self.object_types.items():
+            objs_string = ' '.join(obj)
+            pddl += f"    {objs_string} - {obj_type}\n"
+        pddl += "  )\n"
+        pddl += "  (:init\n"
+        for fact in self.init:
+            pddl = addline(pddl, fact) #pddl +=     #f"    {fact}\n"
+        pddl += "  )\n"
+        pddl += "  (:goal  (and\n"
+        for fact in self.goal:
+            pddl = addline(pddl, fact) #pddl += f"    {fact}\n"
+        pddl += "  ))\n"
+        pddl += ")\n"
+        return pddl
 
     # def is_collision_between_pgp(
     #     self, p1:Placement, g1:Grasp, p2:Placement):
