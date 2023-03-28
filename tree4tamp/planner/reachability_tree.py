@@ -10,7 +10,7 @@ class RTNode:
     def __init__(
         self, 
         abs_state:frozenset,
-        mode: Dict[str, Attachment], 
+        mode: Mode, #Dict[str, Attachment], 
         q:Config, 
         # traj_switch: List[Config]=None
     ):
@@ -31,6 +31,39 @@ class RTNode:
     #     node.abs_state_node = self.abs_state_node
     #     return node
 
+
+@dataclass
+class RTEdge:
+    action: Union[Operator, str]
+    traj: field(default_factory=lambda :None)
+    mode: Mode
+
+class RT:
+    """Reachability Tree"""
+    def __init__(self, root:RTNode):
+        self.V: List[RTNode] = []
+        self.E = {}
+        self.sol:RTNode = None
+        self.add_node(root)
+    
+    @property
+    def root(self):
+        return self.V[0]
+
+    def add_node(self, node:RTNode):
+        node.index = len(self.V)
+        self.V += [node]
+    
+    def add_edge(self, parent:RTNode, child:RTNode, a:Operator, traj:List[Config]=None, mode=None):
+        child.parent = parent
+        edge = RTEdge(a, traj, mode)
+        self.E[(parent.index, child.index)] = edge
+    
+    def get_edge(
+        self, parent:RTNode, child:RTNode)->RTEdge:
+        return self.E[(parent.index, child.index)]
+    
+
 @dataclass
 class ARTNode:
     abs_state: frozenset
@@ -41,7 +74,6 @@ class ARTNode:
     index: int = field(default_factory=lambda :-1)
     parent: Optional["ARTNode"] = field(default_factory=lambda :None)
     children: Dict[Operator,"ARTNode"] = field(default_factory=lambda :{})
-
 
 class ART:
     """Abstract Reachability Tree
@@ -59,7 +91,10 @@ class ART:
     #     self.V.append(node)
 
     def add_child(self, parent:ARTNode, child:ARTNode, action:Operator):
-        self.add_node(child)
+        assert parent.index != -1
+        child.index = len(self.V)
+        self.V.append(child)
+        #self.add_node(child)
         child.parent = parent
         parent.children[action] = child
     

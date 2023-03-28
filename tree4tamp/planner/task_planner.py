@@ -1,6 +1,6 @@
 import numpy as np
 import sys
-from .rt import ART, ARTNode
+from .reachability_tree import ART, ARTNode
 from typing import Iterable, TypeVar, Union, List
 from pyperplan.task import Operator, Task
 #from tree4tamp.tamp.tamp_problem import TAMPProblem
@@ -41,7 +41,7 @@ class TaskPlanningLayer:
         """the main function of Task Planning Layer.
         """
         pi = self.sample_action_sequence(art)
-        return self.get_ARTnode_sequence(art, pi)
+        return pi, self.get_ARTnode_sequence(art, pi)
 
     def get_plan_from_state(self, state:frozenset=None):
         """Symbolic Planner
@@ -56,11 +56,11 @@ class TaskPlanningLayer:
         pi_rand, node = [], tree.root
         #e-greedy:
         while True:
-            a = self.select_by_egreedy(node, self.eps)
+            a = self.select_by_egreedy(node)
             if isinstance(a, str): #TODO: string means the terminal action
                 break # terminate in the middle
             elif a not in node.children:
-                last_abs_state = a.apply(node.state)
+                last_abs_state = a.apply(node.abs_state)
                 pi_rand.append(a)
                 break # terminate with a new leaf
             else:
@@ -83,7 +83,9 @@ class TaskPlanningLayer:
             values = []
             for a in actions:
                 child = node.children[a]
-                values.append(child.reward_sum/child.num_visits)
+                if child.num_visits == 0.:
+                    values.append(0.)
+                else: values.append(child.reward_sum/child.num_visits)
             return actions[np.argmax(values)]
 
     def sample_action_sequence(self, tree:ART):
@@ -102,9 +104,11 @@ class TaskPlanningLayer:
                 abs_state_new = a.apply(node.abs_state)
                 node_new = ARTNode(abs_state_new)
                 tree.add_child(node, node_new, a)
+                node = node_new
 
     def get_ARTnode_sequence(self, tree:ART, pi:List[Operator]):
-        node, seq = tree.root, []
+        node = tree.root
+        seq = [node]
         for a in pi:
             node = node.children[a]
             seq.append(node)

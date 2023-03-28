@@ -168,28 +168,56 @@ class ProblemKitchen(TAMPProblem):
     def set_init_goal(self):
         # set by parent class
         foods = list(self.movables.keys())
-        #hand_clean = [("clear", box) for box in foods]
-        hand_clean = [("handempty")]
+        hand_clean = ("handempty",)
         attached_dish = [("attached", box, "dish1") for box in foods]
-        self.init = [
-            *hand_clean,
+        # tuple: abstract variable, att: mode variable 
+        abs_var_init = [
+            hand_clean,
             *attached_dish
         ]
-        # if self.goal_box_list is None:
-        #     #all cooked
-        #     cooked = [("cooked", box) for box in foods]
-        # else:
+        atts_init = self.get_attachments_from_scene()
+        q_init = self.get_config()
+        self.init = abs_var_init + atts_init + [q_init]
+
+        # att_list = []
+        # for movable_name, movable in self.movables.items():
+        #     sop = movable.sops[0]
+        #     placement = self.get_current_placement_from_scene(movable_name, parent_obj, sop)
+        #     att_list.append(placement)
+        # self.mode_init = Mode.from_list(att_list)
+
         cooked = []
         for box_num in self.goal_box_list:
             assert f"box{box_num}" in foods
             cooked.append(("cooked", f"box{box_num}"))
-        self.goal = [ #and
+        abs_var_goal = [ #and
             *cooked,
             *hand_clean
         ]
-        self.mode_goal = {}
+        atts_goal = []
+        q_goal = deepcopy(q_init)
+        self.goal = abs_var_goal + atts_goal + [q_goal]
 
-    
+
+    def get_attachments_from_scene(self):
+        # mode_init: all movables are placed to the dish
+        #parent_obj = "dish1"    #TODO: automatically detect the attachment between objects
+        att_list = []
+        for placeable_name, placeable in self.placeables.items():
+            for movable_name, movable in self.movables.items():
+                if self.is_placed(movable, placeable): #TODO: automatically detect the grasp
+                    sop = movable.sops[0] # TODO: calculate sop from scene
+                    placement = self.calculate_current_placement_from_scene(movable_name, placeable_name, sop)
+                    att_list.append(placement)
+        return att_list
+        # self.mode_init = Mode.from_list(att_list)
+        
+        # # q_init: robot joint home position
+        # q = {}
+        # for robot_name, robot in self.robots.items():
+        #     q[robot_name] = robot.get_joint_angles()
+        # self.q_init = Config(q)
+        # #self.geometry_assign(self.mode_init, self.config_init)
 
 # class ProblemKitchen(TAMPProblem):
 #     def __init__(self, domain: DomainKitchen, cooked_list=None):
@@ -240,26 +268,8 @@ class ProblemKitchen(TAMPProblem):
 #     #     ]
 #     #     self.mode_goal = {}
 
-#     def set_init_mode_config(self):
-#         # mode_init: all movables are placed to the dish
-#         parent_obj = "dish1"
-#         att_list = []
-#         for movable_name, movable in self.scene.movables.items():
-#             sop = movable.sops[0]
-#             placement = self.scene.get_current_placement_from_scene(movable_name, parent_obj, sop)
-#             att_list.append(placement)
-#         self.mode_init = Mode.from_list(att_list)
-        
-#         # config_init: robot joint home position
-#         q = {}
-#         for robot_name, robot in self.scene.robots.items():
-#             q[robot_name] = robot.get_joint_angles()
-#         self.config_init = Config(q)
-#         self.scene.geometry_assign(self.mode_init, self.config_init)
+
 
 if __name__ == "__main__":
-    dom = DomainKitchen(gui=True, num_box=5)
-    problem = ProblemKitchen(dom)
-    dom.domain_pddl_path
-    problem.make_temp_pddl_files()
+    pass
     

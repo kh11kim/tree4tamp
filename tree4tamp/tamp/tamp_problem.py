@@ -1,4 +1,3 @@
-from multiprocessing.sharedctypes import Value
 from pybullet_suite import *
 from copy import deepcopy
 #from dataclasses import dataclass, field
@@ -6,7 +5,6 @@ from itertools import product
 from .tamp_object import *
 #from .checker import Checker
 from .tamp_action import *
-
 
 class TAMPProblem:
     """TAMP world interface"""
@@ -33,7 +31,7 @@ class TAMPProblem:
         self.set_task_scene()
         self.set_tamp_object_config(self.movables, self.regions, self.robots)
         self.set_init_goal()
-        #self.set_init_mode_config()
+        self.set_init_geometry_from_scene()
         
         #self.set_objects()
 
@@ -75,6 +73,8 @@ class TAMPProblem:
         #raise NotImplementedError()
         pass
     
+    def set_init_geometry_from_scene(self):
+        pass
 
 
     # def set_tamp_objects(self, movables: Dict, regions: Dict, robots: Dict):
@@ -95,6 +95,12 @@ class TAMPProblem:
     #------------------------------------------
     # Geometry Assignment and Collision Check
     #------------------------------------------
+    def get_config(self):
+        q = {}
+        for robot_name, robot in self.robots.items():
+            q[robot_name] = robot.get_joint_angles()
+        return Config(q)
+        
     def set_config(self, config: Config):
         for robot in config.q.keys():
             q = config.q[robot]
@@ -244,12 +250,12 @@ class TAMPProblem:
     # Geometry Calculation and Sampling
     #------------------------------------------
     def sample_attachment(self, obj_name: str, parent_name: str):
-        def sample_grasp(self, obj_name: str, parent_name: str):
+        def sample_grasp(obj_name: str, parent_name: str):
             movable: Movable = self.objects[obj_name]
             grasp = movable.sample_grasp()
             grasp.parent_name = parent_name
             return grasp
-        def sample_placement(self, obj_name: str, parent_name: str, yaw=None):
+        def sample_placement(obj_name: str, parent_name: str, yaw=None):
             movable: Movable = self.objects[obj_name]
             placeable: TAMPObject = self.objects[parent_name]
             sssp = placeable.sssp
@@ -268,10 +274,10 @@ class TAMPProblem:
         else:
             return sample_placement(obj_name, parent_name)
     
-    def sample_attachment_by_action(self, action:Attach):
-        return self.sample_attachment(action.target_obj_name, action.parent_to)
+    def sample_attachment_by_action(self, action:Operator):
+        return self.sample_attachment(action.get_target_movable(), action.get_parent_to())
     
-    def get_current_placement_from_scene(self, obj_name: str, parent_name: str, sop:SOP):
+    def calculate_current_placement_from_scene(self, obj_name: str, parent_name: str, sop:SOP):
         movable: Movable = self.objects[obj_name]
         placeable: TAMPObject = self.objects[parent_name]
         
