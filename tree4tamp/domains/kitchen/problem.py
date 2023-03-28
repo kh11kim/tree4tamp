@@ -189,7 +189,22 @@ class ProblemKitchen(TAMPProblem):
         ]
         self.mode_goal = {}
 
-    
+    def set_init_geometry_from_scene(self):
+        # mode_init: all movables are placed to the dish
+        parent_obj = "dish1"    #TODO: automatically detect the attachment between objects
+        att_list = []
+        for movable_name, movable in self.movables.items():
+            sop = movable.sops[0]
+            placement = self.get_current_placement_from_scene(movable_name, parent_obj, sop)
+            att_list.append(placement)
+        self.mode_init = Mode.from_list(att_list)
+        
+        # q_init: robot joint home position
+        q = {}
+        for robot_name, robot in self.robots.items():
+            q[robot_name] = robot.get_joint_angles()
+        self.q_init = Config(q)
+        #self.geometry_assign(self.mode_init, self.config_init)
 
 # class ProblemKitchen(TAMPProblem):
 #     def __init__(self, domain: DomainKitchen, cooked_list=None):
@@ -240,26 +255,8 @@ class ProblemKitchen(TAMPProblem):
 #     #     ]
 #     #     self.mode_goal = {}
 
-#     def set_init_mode_config(self):
-#         # mode_init: all movables are placed to the dish
-#         parent_obj = "dish1"
-#         att_list = []
-#         for movable_name, movable in self.scene.movables.items():
-#             sop = movable.sops[0]
-#             placement = self.scene.get_current_placement_from_scene(movable_name, parent_obj, sop)
-#             att_list.append(placement)
-#         self.mode_init = Mode.from_list(att_list)
-        
-#         # config_init: robot joint home position
-#         q = {}
-#         for robot_name, robot in self.scene.robots.items():
-#             q[robot_name] = robot.get_joint_angles()
-#         self.config_init = Config(q)
-#         self.scene.geometry_assign(self.mode_init, self.config_init)
+
 
 if __name__ == "__main__":
-    dom = DomainKitchen(gui=True, num_box=5)
-    problem = ProblemKitchen(dom)
-    dom.domain_pddl_path
-    problem.make_temp_pddl_files()
+    pass
     

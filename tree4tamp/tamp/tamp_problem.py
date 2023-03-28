@@ -1,4 +1,3 @@
-from multiprocessing.sharedctypes import Value
 from pybullet_suite import *
 from copy import deepcopy
 #from dataclasses import dataclass, field
@@ -33,7 +32,7 @@ class TAMPProblem:
         self.set_task_scene()
         self.set_tamp_object_config(self.movables, self.regions, self.robots)
         self.set_init_goal()
-        #self.set_init_mode_config()
+        self.set_init_geometry_from_scene()
         
         #self.set_objects()
 
@@ -75,6 +74,8 @@ class TAMPProblem:
         #raise NotImplementedError()
         pass
     
+    def set_init_geometry_from_scene(self):
+        pass
 
 
     # def set_tamp_objects(self, movables: Dict, regions: Dict, robots: Dict):
