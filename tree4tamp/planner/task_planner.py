@@ -1,5 +1,7 @@
 import numpy as np
 import sys
+
+from sympy import re
 from .reachability_tree import ART, ARTNode
 from typing import Iterable, TypeVar, Union, List
 from pyperplan.task import Operator, Task
@@ -14,25 +16,24 @@ def choose_random(x:Iterable[T])->T:
     i = np.random.randint(0, len(x))
     return x[i]
 
-class TaskPlanningLayer:
+class TaskPlanner:
     def __init__(
-        self, 
-        pddl_dom_path, 
-        pddl_prob_str,
+        self,
+        task,
         planner="wastar",
         heuristic="hff",
         p_terminal=0.005,
         eps=0.5
     ):
-        parser = Parser(pddl_dom_path)
-        parser.probInput = pddl_prob_str
-        self.pddl_domain = parser.parse_domain()
-        self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
-
-        self.task = _ground(self.pddl_problem)
-        self.abs_state_init = self.task.initial_state
+        # parser = Parser(pddl_dom_path)
+        # parser.probInput = pddl_prob_str
+        # self.pddl_domain = parser.parse_domain()
+        # self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
+        # self.task = _ground(self.pddl_problem)
+        # self.abs_state_init = self.task.initial_state
+        self.task = task
         self.search = SEARCHES[planner]
-        self.heuristic = HEURISTICS[heuristic](self.task)
+        self.heuristic = HEURISTICS[heuristic](task)
 
         self.p_terminal = p_terminal
         self.eps = eps
@@ -60,13 +61,13 @@ class TaskPlanningLayer:
             if isinstance(a, str): #TODO: string means the terminal action
                 break # terminate in the middle
             elif a not in node.children:
-                last_abs_state = a.apply(node.abs_state)
+                node = a.apply(node.abs_state)
                 pi_rand.append(a)
                 break # terminate with a new leaf
             else:
                 node = node.children[a]
                 pi_rand.append(a) # select the node by the action and continue
-        return last_abs_state, pi_rand
+        return node, pi_rand
 
     def select_by_egreedy(self, node:ARTNode)->Union[str, Operator]:
         if np.random.random() < self.p_terminal:
@@ -88,22 +89,22 @@ class TaskPlanningLayer:
                 else: values.append(child.reward_sum/child.num_visits)
             return actions[np.argmax(values)]
 
-    def sample_action_sequence(self, tree:ART):
-        last_abs_state, pi_rand = self.randomized_tree_search(tree)
+    def sample_action_sequence(self, art:ART):
+        last_abs_state, pi_rand = self.randomized_tree_search(art)
         pi_plan = self.get_plan_from_state(last_abs_state)
         pi = pi_rand + pi_plan
-        self.extend_tree_by_pi(tree, pi)
+        self.extend_tree_by_pi(art, pi)
         return pi
     
-    def extend_tree_by_pi(self, tree:ART, pi:List[Operator]):
-        node = tree.root
+    def extend_tree_by_pi(self, art:ART, pi:List[Operator]):
+        node = art.root
         for a in pi:
             if a in node.children:
                 node = node.children[a]
             else:
                 abs_state_new = a.apply(node.abs_state)
                 node_new = ARTNode(abs_state_new)
-                tree.add_child(node, node_new, a)
+                art.add_child(node, node_new, a)
                 node = node_new
 
     def get_ARTnode_sequence(self, tree:ART, pi:List[Operator]):
@@ -113,3 +114,8 @@ class TaskPlanningLayer:
             node = node.children[a]
             seq.append(node)
         return seq
+
+    def update_tree(self, art_node_seq:List[ARTNode], reward:float):
+        for art_node in art_node_seq:
+            art_node.num_visits += 1
+            art_node.reward_sum += reward

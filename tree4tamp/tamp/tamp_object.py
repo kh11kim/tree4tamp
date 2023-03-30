@@ -29,6 +29,7 @@ class Attachment:
     tf: Pose
     parent_name: Optional[str] = field(default_factory=lambda : None)
     pre_pose_distance: Optional[float] = field(default_factory=lambda : PRE_POSE_DISTANCE)
+    att_type: str = field(default_factory=lambda :"")
 
     @staticmethod
     def get_pre_pose(pose:Pose):
@@ -44,6 +45,7 @@ class Grasp(Attachment):
     width: Optional[float] = field(default_factory=lambda : 0)
     approach: str = field(default_factory=lambda :"top")
     pre_pose: Optional[Pose] = field(default_factory=lambda :None)
+    att_type: str = field(default_factory=lambda :"grasp")
     
     def __post_init__(self):
         if self.approach == "top":
@@ -71,6 +73,7 @@ class Placement(Attachment):
     sop: Optional[SOP] = field(default_factory=lambda : None)
     yaw: Optional[float] = field(default_factory=lambda : None)
     obj_pose: Optional[Pose] = field(default_factory=lambda : None)
+    att_type: str = field(default_factory=lambda :"placement")
 
     def get_pre_pose(self, pose: Pose):
         pre_pose = Pose(trans=[0,0,+self.pre_pose_distance])
@@ -110,12 +113,22 @@ class Placement(Attachment):
 class Mode:
     """ All attachments of movables"""
     def __init__(self, atts: Dict[str, Attachment]):
-        self.attachments: Dict[str, Attachment] = atts
+        self.atts: Dict[str, Attachment] = atts
         #self.mode_key: Dict[str, Tuple[str, np.ndarray]] = self.get_mode_key(atts)
 
     def set_attachment(self, att:Attachment):
-        self.attachments[att.obj_name] = att
+        mode_new = deepcopy(self)
+        if att is None: return mode_new
+        mode_new.atts[att.obj_name] = att
+        return mode_new
         #self.mode_key = self.get_mode_key(self.attachments)
+
+    @classmethod
+    def from_list(cls, atts_list:List[Attachment]):
+        atts = {}
+        for att in atts_list:
+            atts[att.obj_name] = att
+        return cls(atts)
 
     def __repr__(self):
         s = "_".join([obj+"-"+key[0] for obj, key in self.mode_key.items()])
@@ -148,7 +161,7 @@ class Mode:
         return cls(atts)
             
     def copy(self):
-        return Mode(deepcopy(self.attachments))
+        return Mode(deepcopy(self.atts))
 
     # def __eq__(self, other:"Mode"):
     #     for obj in self.mode_key:
@@ -243,12 +256,17 @@ class Region(TAMPObject):
         return cls(body.physics_client, body.uid, name, sssp)
 
 
-@dataclass
 class Config:    
     """A Configuration of the robots"""
-    q: Dict[str, np.ndarray]
+    robot_names = []
+    def __init__(self, q_dict : Dict[str, np.ndarray]):
+        self.q = q_dict
     #robot_names: ClassVar[List[str]] = []
     
+    @classmethod
+    def set_robot_names(cls, robot_names:List):
+        cls.robot_names = robot_names
+
     def __repr__(self):
         return f"Config:"
 

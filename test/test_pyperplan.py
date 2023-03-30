@@ -6,7 +6,7 @@ problem = ProblemKitchen(gui=False, num_box=3, goal_box_list="all")
 domain_file = "tree4tamp/domains/kitchen/domain_abstract.pddl"
 
 pddl_prob_string = problem.generate_pddl_problem_as_string()
-tp = TaskPlanningLayer(
+tp = TaskPlanner(
     domain_file,
     pddl_prob_string
 )

@@ -15,12 +15,16 @@ class RTNode:
         # traj_switch: List[Config]=None
     ):
         self.s = abs_state
-        self.sigma = mode
+        self.mode = mode
         self.q = q
         
         self.index: int = -1
         self.parent: RTNode = None
+        
         # self.traj_switch = traj_switch
+
+    def unpack(self):
+        return self.s, self.mode, self.q
 
     # def copy(self):
     #     q = deepcopy(self.q)
@@ -56,12 +60,17 @@ class RT:
     
     def add_edge(self, parent:RTNode, child:RTNode, a:Operator, traj:List[Config]=None, mode=None):
         child.parent = parent
-        edge = RTEdge(a, traj, mode)
+        edge = RTEdge(a, traj, parent.mode)
         self.E[(parent.index, child.index)] = edge
     
     def get_edge(
         self, parent:RTNode, child:RTNode)->RTEdge:
         return self.E[(parent.index, child.index)]
+    
+    def add_child(self, parent:RTNode, child:RTNode, a:Operator, traj:List[Config]=None):
+        self.add_node(child)
+        self.add_edge(parent, child, a, traj, parent.mode)
+        child.parent = parent
     
 
 @dataclass
@@ -74,6 +83,11 @@ class ARTNode:
     index: int = field(default_factory=lambda :-1)
     parent: Optional["ARTNode"] = field(default_factory=lambda :None)
     children: Dict[Operator,"ARTNode"] = field(default_factory=lambda :{})
+
+    def sample_rt_node(self):
+        if len(self.rt_node_list) == 0: return None
+        idx = np.random.randint(0, len(self.rt_node_list))
+        return self.rt_node_list[idx]
 
 class ART:
     """Abstract Reachability Tree

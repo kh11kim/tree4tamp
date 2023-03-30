@@ -1,10 +1,11 @@
 from pybullet_suite import *
 from copy import deepcopy
-#from dataclasses import dataclass, field
 from itertools import product
 from .tamp_object import *
-#from .checker import Checker
 from .tamp_action import *
+sys.path.append('./pyperplan/')
+from pyperplan.pddl.parser import Parser
+from pyperplan.planner import _ground
 
 class TAMPProblem:
     """TAMP world interface"""
@@ -13,7 +14,7 @@ class TAMPProblem:
         domain_name,
         prob_name,
         gui,
-        domain_pddl_path
+        domain_pddl_path,
     ):
         self.domain_name = domain_name
         self.prob_name = prob_name
@@ -21,8 +22,10 @@ class TAMPProblem:
         self.regions: Dict[str, Region] = {}
         self.robots: Dict[str, Robot] = {}
         self.envs: Dict[str, Body] = {}
-        self.domain_pddl_path = domain_pddl_path
+        self.q_goal = None
+        self.atts_goal = None
 
+        # geometry world
         self.world = BulletWorld(gui=gui)
         self.sm = BulletSceneMaker(self.world)
         # self.hand = Gripper(self.world, self.sm)
@@ -32,6 +35,10 @@ class TAMPProblem:
         self.set_tamp_object_config(self.movables, self.regions, self.robots)
         self.set_init_goal()
         self.set_init_geometry_from_scene()
+        self.set_task_domain_problem(domain_pddl_path)
+
+        Config.set_robot_names(list(self.robots.keys()))
+
         
         #self.set_objects()
 
@@ -76,6 +83,14 @@ class TAMPProblem:
     def set_init_geometry_from_scene(self):
         pass
 
+    def set_task_domain_problem(self, domain_pddl_path):
+        # abstract world
+        parser = Parser(domain_pddl_path)
+        parser.probInput = self.generate_pddl_problem_as_string()
+        self.pddl_domain = parser.parse_domain()
+        self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
+        self.task = _ground(self.pddl_problem)
+        self.abs_state_init = deepcopy(self.task.initial_state)
 
     # def set_tamp_objects(self, movables: Dict, regions: Dict, robots: Dict):
     #     self.movables = None
@@ -100,7 +115,7 @@ class TAMPProblem:
         for robot_name, robot in self.robots.items():
             q[robot_name] = robot.get_joint_angles()
         return Config(q)
-        
+
     def set_config(self, config: Config):
         for robot in config.q.keys():
             q = config.q[robot]
@@ -151,24 +166,24 @@ class TAMPProblem:
         
         # make graph and check cycle.
         parents = {}
-        for obj, att in mode.attachments.items():
+        for obj, att in mode.atts.items():
             parents[obj] = att.parent_name
         if has_cycle(parents):
             raise ValueError("A cycle is detected in kinematic tree..!")
         
         # assign the mode
         assigned = []
-        for obj, att in mode.attachments.items():
+        for obj, att in mode.atts.items():
             if obj not in assigned:
-                self.assign_obj(obj, parents, mode.attachments, assigned)
+                self.assign_obj(obj, parents, mode.atts, assigned)
 
     def geometry_assign(self, mode:Mode, config:Optional[Config]=None):
-        self.mode_assign(mode)
         self.set_config(config)
+        self.mode_assign(mode)
         
         # assign the gripper width
         is_grasp = False
-        for att in mode.attachments.values():
+        for att in mode.atts.values():
             if isinstance(att, Grasp):
                 self.robots[att.parent_name].open(att.width)
                 is_grasp = True
@@ -215,9 +230,9 @@ class TAMPProblem:
         # if only_fixed: return False
 
         # robot-movable
-        movables = list(mode.attachments.keys())
+        movables = list(mode.atts.keys())
         for robot, obs in product(self.robots, movables):
-            if robot == mode.attachments[obs].parent_name: continue
+            if robot == mode.atts[obs].parent_name: continue
             if self.world.is_body_pairwise_collision(
                 body=robot, obstacles=[obs]):
                 return True
@@ -227,8 +242,8 @@ class TAMPProblem:
         #movable-movable collision
         for movable1, movable2 in product(movables, movables):
             if movable1 == movable2: continue
-            if movable2 == mode.attachments[movable1].parent_name: continue
-            if movable1 == mode.attachments[movable2].parent_name: continue
+            if movable2 == mode.atts[movable1].parent_name: continue
+            if movable1 == mode.atts[movable2].parent_name: continue
             if self.world.is_body_pairwise_collision(
                 body=movable1, obstacles=[movable2]):
                 return True
@@ -277,6 +292,14 @@ class TAMPProblem:
     def sample_attachment_by_action(self, action:Operator):
         return self.sample_attachment(action.get_target_movable(), action.get_parent_to())
     
+    def sample_random_config(self):
+        q_dict = {}
+        for robot_name in self.robots.keys():
+            ll = self.robots[robot_name].joint_lower_limit
+            ul = self.robots[robot_name].joint_upper_limit
+            q_dict[robot_name] = np.random.uniform(ll, ul)
+        return Config(q_dict)
+
     def calculate_current_placement_from_scene(self, obj_name: str, parent_name: str, sop:SOP):
         movable: Movable = self.objects[obj_name]
         placeable: TAMPObject = self.objects[parent_name]
@@ -292,33 +315,36 @@ class TAMPProblem:
         #placement.assigned_tf = placeable.get_base_pose() * placement.tf.inverse()
         return placement
 
+    def sample_transition(self, mode:Mode, q:Config, mode_new:Mode):
+        q_new = deepcopy(q)
+        for m in self.movables.keys():
+            if mode.atts[m].att_type != mode_new.atts[m].att_type: #TODO: considering handover
+                if isinstance(mode.atts[m], Grasp):
+                    grasp, placement = mode.atts[m], mode_new.atts[m]
+                else:
+                    placement, grasp = mode.atts[m], mode_new.atts[m]
+        q_pre_ik, grasp_pose = self.get_ik(grasp, placement, grasp.parent_name, mode)
+        q_new.set_joints(grasp.parent_name, q_pre_ik)
+        return q_new, grasp_pose
+
     def get_ik(
-        self, robot_name:str, mode:Mode, att1: Attachment, att2: Attachment, 
+        self, grasp: Grasp, placement: Placement, robot_name:str, mode:Mode, 
         robot_base_pose: Pose=Pose.identity()
     ) -> bool:
-        if type(att1) != type(att2):
-            if type(att1) is Placement:
-                grasp, placement = att2, att1
-            else:
-                grasp, placement = att1, att2
-            self.mode_assign(mode)
-            parent_pose = self.objects[placement.parent_name].get_base_pose()
-            obj_pose = parent_pose * placement.tf.inverse()
-            ee_pose = obj_pose * grasp.tf
-            
-            grasp_pose = robot_base_pose.inverse() * ee_pose
-            grasp_pose_pre = grasp.get_pre_pose(grasp_pose)
-            
-            robot = self.robots[robot_name]
-            q_pre_ik = robot.inverse_kinematics(pose=grasp_pose_pre)
-            if q_pre_ik is None: return None
-            q_ik = robot.inverse_kinematics(pose=grasp_pose)
-            if q_ik is None: return None
-            return (q_pre_ik, q_ik, ee_pose)
-        elif type(att1) is Grasp:
-            return NotImplementedError("Handover")
-        else:
-            raise ValueError("There is no placement to placement action")
+        self.mode_assign(mode)
+        parent_pose = self.objects[placement.parent_name].get_base_pose()
+        obj_pose = parent_pose * placement.tf.inverse()
+        ee_grasp_pose = obj_pose * grasp.tf # wrt world
+        
+        grasp_pose = robot_base_pose.inverse() * ee_grasp_pose #wrt robot
+        grasp_pose_pre = grasp.get_pre_pose(grasp_pose)
+        
+        robot = self.robots[robot_name]
+        q_pre_ik = robot.inverse_kinematics(pose=grasp_pose_pre)
+        if q_pre_ik is None: return None
+        q_ik = robot.inverse_kinematics(pose=grasp_pose)
+        if q_ik is None: return None
+        return q_pre_ik, grasp_pose
     
     def generate_pddl_problem_as_string(self):
         def addline(pddl, fact):

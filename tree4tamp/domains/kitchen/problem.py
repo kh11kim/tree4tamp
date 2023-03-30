@@ -6,7 +6,12 @@ from ...tamp import *
 
 ##############################
 class ProblemKitchen(TAMPProblem):
-    def __init__(self, gui, num_box=3, goal_box_list=None):
+    def __init__(
+        self, 
+        gui, 
+        num_box=3, 
+        goal_box_list=None, 
+    ):
         domain_pddl_path = Path(__file__).parent / Path("domain_abstract.pddl")
         self.num_box = num_box
         if goal_box_list== "all":
@@ -19,7 +24,7 @@ class ProblemKitchen(TAMPProblem):
             self.domain_name,
             self.problem_name,
             gui,
-            domain_pddl_path=domain_pddl_path
+            domain_pddl_path=domain_pddl_path,
         )
                 
         # not mandatory
@@ -178,6 +183,15 @@ class ProblemKitchen(TAMPProblem):
         atts_init = self.get_attachments_from_scene()
         q_init = self.get_config()
         self.init = abs_var_init + atts_init + [q_init]
+        
+        init_atts = []
+        for var in self.init:
+            if isinstance(var, Attachment):
+                init_atts.append(var)
+            if isinstance(var, Config):
+                self.q_init = var
+        assert set(self.movables.keys()) == set([att.obj_name for att in init_atts])
+        self.mode_init = Mode.from_list(init_atts)
 
         # att_list = []
         # for movable_name, movable in self.movables.items():
@@ -194,9 +208,10 @@ class ProblemKitchen(TAMPProblem):
             *cooked,
             *hand_clean
         ]
-        atts_goal = []
-        q_goal = deepcopy(q_init)
-        self.goal = abs_var_goal + atts_goal + [q_goal]
+        self.atts_goal = []
+        self.q_goal = deepcopy(q_init)
+        self.goal = abs_var_goal + self.atts_goal + [self.q_goal]
+        self.atts_goal_dict = {att.obj_name:att for att in self.atts_goal}
 
 
     def get_attachments_from_scene(self):
