@@ -11,20 +11,31 @@ class RTNode:
         self, 
         abs_state:frozenset,
         mode: Mode, #Dict[str, Attachment], 
-        q:Config, 
-        # traj_switch: List[Config]=None
+        q:Config
     ):
         self.s = abs_state
         self.mode = mode
         self.q = q
-        
+        self.grasp_pose = {}
+        self.approach_traj = None
+        self.q_grasp = None
         self.index: int = -1
         self.parent: RTNode = None
         
-        # self.traj_switch = traj_switch
+        
 
     def unpack(self):
         return self.s, self.mode, self.q
+
+    def set_q_grasp(self, q_grasp, grasp_robot_name):
+        self.q_grasp = q_grasp
+        self.grasp_robot_name = grasp_robot_name
+
+    def set_grasp_pose(self, grasp_pose, robot_name):
+        self.grasp_pose[robot_name] = grasp_pose
+    
+    def set_approach_traj(self, traj):
+        self.approach_traj = traj
 
     # def copy(self):
     #     q = deepcopy(self.q)

@@ -23,7 +23,7 @@ class TAMPProblem:
         self.robots: Dict[str, Robot] = {}
         self.envs: Dict[str, Body] = {}
         self.q_goal = None
-        self.atts_goal = None
+        self.atts_goal: Dict[str, Attachment] = {}
 
         # geometry world
         self.world = BulletWorld(gui=gui)
@@ -34,11 +34,11 @@ class TAMPProblem:
         self.set_task_scene()
         self.set_tamp_object_config(self.movables, self.regions, self.robots)
         self.set_init_goal()
-        self.set_init_geometry_from_scene()
+        #self.set_init_geometry_from_scene()
         self.set_task_domain_problem(domain_pddl_path)
 
         Config.set_robot_names(list(self.robots.keys()))
-
+        Mode.set_movable_names(list(self.movables.keys()))
         
         #self.set_objects()
 
@@ -91,21 +91,6 @@ class TAMPProblem:
         self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
         self.task = _ground(self.pddl_problem)
         self.abs_state_init = deepcopy(self.task.initial_state)
-
-    # def set_tamp_objects(self, movables: Dict, regions: Dict, robots: Dict):
-    #     self.movables = None
-    #     self.regions = None
-    #     self.robots = None
-    #     raise NotImplementedError()
-    
-    # def save(self):
-    #     return self.world.save_state()
-    
-    # def restore(self, bullet_state):
-    #     self.world.restore_state(bullet_state)
-
-    # def reset(self):
-    #     self.world.restore_state(self.init_state)
     
     #------------------------------------------
     # Geometry Assignment and Collision Check
@@ -146,7 +131,6 @@ class TAMPProblem:
 
     def mode_assign(self, mode:Mode):
         def has_cycle(parents):
-            visited = set()
             def dfs(node):
                 if node in visited: return True
                 
@@ -159,6 +143,7 @@ class TAMPProblem:
                 return False
 
             for node in parents.keys():
+                visited = set()
                 if node not in visited:
                     if dfs(node):
                         return True
@@ -316,16 +301,18 @@ class TAMPProblem:
         return placement
 
     def sample_transition(self, mode:Mode, q:Config, mode_new:Mode):
-        q_new = deepcopy(q)
+        q_pre = deepcopy(q)
+        q_grasp = deepcopy(q)
         for m in self.movables.keys():
             if mode.atts[m].att_type != mode_new.atts[m].att_type: #TODO: considering handover
                 if isinstance(mode.atts[m], Grasp):
                     grasp, placement = mode.atts[m], mode_new.atts[m]
                 else:
                     placement, grasp = mode.atts[m], mode_new.atts[m]
-        q_pre_ik, grasp_pose = self.get_ik(grasp, placement, grasp.parent_name, mode)
-        q_new.set_joints(grasp.parent_name, q_pre_ik)
-        return q_new, grasp_pose
+        q_pre_ik, q_ik = self.get_ik(grasp, placement, grasp.parent_name, mode)
+        q_pre.set_joints(grasp.parent_name, q_pre_ik)
+        q_grasp.set_joints(grasp.parent_name, q_ik)
+        return q_pre, q_grasp, grasp.parent_name
 
     def get_ik(
         self, grasp: Grasp, placement: Placement, robot_name:str, mode:Mode, 
@@ -344,7 +331,7 @@ class TAMPProblem:
         if q_pre_ik is None: return None
         q_ik = robot.inverse_kinematics(pose=grasp_pose)
         if q_ik is None: return None
-        return q_pre_ik, grasp_pose
+        return q_pre_ik, q_ik
     
     def generate_pddl_problem_as_string(self):
         def addline(pddl, fact):

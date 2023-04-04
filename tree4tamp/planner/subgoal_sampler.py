@@ -16,8 +16,44 @@ class SubgoalSampler:
             """the main function of SS layer"""
             pass
     
-    def feasibility_check_by_goal_candidate(self, tree:RT):
-        pass
+    def sample_batch_atts_with_last_mode(self, pi:List[Operator], last_mode:Mode):
+        last_atts = deepcopy(last_mode.atts)
+        
+        attachments = []
+        for a in pi[::-1]:
+            if not a.is_geometric_action():
+                attachments.append(None)
+                continue
+            
+            m = a.get_target_movable()
+            if m in last_atts.keys():
+                att = last_atts[m] #get goal attachment
+                last_atts.pop(m, None)
+            else:
+                #sample attachment
+                att = self.problem.sample_attachment_by_action(a)
+            attachments.append(att)
+        return attachments[::-1]
+
+    def sample_goal_state_directly(self, last_abs_state:frozenset):
+        if self.problem.q_goal is not None:
+            q_goal = self.problem.q_goal
+        else:
+            q_goal = self.problem.sample_random_config()
+        
+        mode_goal = {}
+        for predicate in last_abs_state:
+            if not "attached" in predicate: continue
+            
+            _, movable, parent = predicate.strip("()").split(" ")
+            if movable not in self.problem.atts_goal.keys():
+                mode_goal[movable] = self.problem.sample_attachment(movable, parent)
+            else:
+                mode_goal[movable] = deepcopy(self.problem.atts_goal[movable])
+        
+        return RTNode(last_abs_state, Mode(mode_goal), q_goal)
+
+
 
     def sample_batch_attachments(self, pi: List[Operator]):
         attachments = []

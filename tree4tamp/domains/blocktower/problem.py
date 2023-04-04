@@ -5,103 +5,101 @@ from ...tamp import *
 
 
 ##############################
-class ProblemKitchen(TAMPProblem):
+class ProblemBlocktower(TAMPProblem):
     def __init__(
         self, 
         gui, 
-        num_box=3, 
-        goal_box_list=None,
+        num_box=5, 
     ):
         domain_pddl_path = Path(__file__).parent / Path("domain_abstract.pddl")
         self.num_box = num_box
-        if goal_box_list== "all":
-            self.goal_box_list = [*range(1, num_box+1)]
-        else:
-            self.goal_box_list = goal_box_list
-        self.domain_name = "KITCHEN"
-        self.problem_name = f"KITCHEN{num_box}"
+        self.domain_name = "PICK-PLACE-STACK-UNSTACK"
+        self.problem_name = f"BLOCKTOWER{num_box}"
         super().__init__(
             self.domain_name,
             self.problem_name,
             gui,
             domain_pddl_path=domain_pddl_path,
         )
-        
+
     def set_task_scene(self):
-        with self.world.no_rendering():
+        with self.world.no_rendering(True):
             sm = BulletSceneMaker(self.world)
             plane = sm.create_plane(z_offset=-0.4)
 
             # set environment
             self.envs = {}
+            table_x_offset = 0.4
+            h_table = 0.2
             self.envs["table"] = sm.create_table(
                 "table", 0.4, 1.2, 0.2, 
-                x_offset=0.4, y_offset=0, z_offset=0.2)
+                x_offset=table_x_offset, y_offset=0, z_offset=h_table)
             self.envs["ground"] = sm.create_table("ground", 2, 2, 0.4) #ground
             
-            # set regions
+            # regions spec
+            w_plate, h_plate = 0.3, 0.02
+            gap_plate = 0.32
+            plate_names = ["plate1", "plate2", "plate3"]
+            plate_half_extents = [w_plate/2, w_plate/2, h_plate/2]
+            plate_color = [0.6, 0.6, 0.6, 1]
+            plate_positions = [
+                [table_x_offset, 0, 0.2+0.01],
+                [table_x_offset, +gap_plate, 0.2+0.01],
+                [table_x_offset, -gap_plate, 0.2+0.01]
+            ]
             self.regions = {}
-            names = ["dish1", "sink1", "oven1"]
-            w, h = 0.22, 0.02
-            half_extents = [
-                [w/2, w/2, h/2],
-                [w/2, w/2, h/2],
-                [w/2, w/2, h/2],
-            ]
-            positions = [
-                [0.4, 0, 0.2+0.01],
-                [0.4, +0.3, 0.2+0.01],
-                [0.4, -0.3, 0.2+0.01]
-            ]
-            colors = [
-                [0.6, 0.6, 0.6, 1],
-                [0, 0, 1, 1],
-                [1, 0, 0, 1]
-            ]
-            for idx, name in enumerate(names):
-                self.regions[name] = sm.create_box(
-                    body_name=name, 
-                    half_extents=half_extents[idx], 
-                    mass=1., 
-                    pose=Pose(trans=positions[idx]),
-                    rgba_color=colors[idx])
+            for idx in range(3):
+                region_name = plate_names[idx]
+                self.regions[region_name] = sm.create_box(
+                    body_name=region_name,
+                    half_extents=plate_half_extents,
+                    mass=1.,
+                    pose=Pose(trans=plate_positions[idx]),
+                    rgba_color=plate_color
+                )
             
-            # set movables
-            self.movables = {}
-            w, h = 0.06, 0.07
-            half_extents = [w/2, w/2, h/2]
-            gap = w+0.035
-            names = [f"box{i+1}" for i in range(self.num_box)]
-            positions = [
-                [0.4, 0, 0.2+0.02+0.05],
-                [0.4, -gap, 0.2+0.02+0.05],
-                [0.4, +gap, 0.2+0.02+0.05],
-                [0.4-gap, 0, 0.2+0.02+0.05],
-                [0.4+gap, 0, 0.2+0.02+0.05]
-            ]
-            colors = [
+            # movables spec
+            w_movable, h_movable = 0.04, 0.04
+            movable_half_extents = [w_movable/2, w_movable/2, h_movable/2]
+            movable_colors = [
                 [1, 0, 0, 1],
+                [1, 0.5, 0, 1],
+                [1, 1, 0, 1],
                 [0, 1, 0, 1],
                 [0, 0, 1, 1],
-                [0.7, 0.7, 0, 1],
-                [0.7, 0, 0.7, 1],
+                [0.3, 0, 0.5, 1],
+                [0.6, 0, 0.8, 1],
             ]
-            for idx, name in enumerate(names[:self.num_box]):
-                self.movables[name] = sm.create_box(
-                    body_name=name, 
-                    half_extents=half_extents, 
-                    mass=1., 
-                    pose=Pose(trans=positions[idx]),
-                    rgba_color=colors[idx])
+            movable_names = [f"block{i}" for i in range(1, self.num_box+1)]
+            left_xy_position = [table_x_offset, -gap_plate]
+            right_xy_position = [table_x_offset, +gap_plate]
+            xy_positions = [left_xy_position, right_xy_position]
+
+            left_side_blocks = list(np.random.choice(movable_names, self.num_box // 2, replace=False))
+            right_side_blocks = [name for name in movable_names if name not in left_side_blocks]
+            block_groups = [left_side_blocks, right_side_blocks]
+
+            np.random.shuffle(left_side_blocks)
+            np.random.shuffle(right_side_blocks)
+
+            for xy_pos, blocks in zip(xy_positions, block_groups):
+                h = h_table + h_plate + h_movable/2 #init
+                for block_name in blocks:
+                    block_idx = int(block_name.strip("block")) - 1
+                    self.movables[block_name] = sm.create_box(
+                        body_name=block_name, 
+                        half_extents=movable_half_extents, 
+                        mass=1., 
+                        pose=Pose(trans=[*xy_pos, h]),
+                        rgba_color=movable_colors[block_idx])
+                    h += h_movable
 
             # set robot
             self.robots = {"robot":self.world.load_robot(name="robot", robot_class=Panda)}
             self.object_types = {
                 "robot": ["robot"],
-                "sink": ["sink1"],
-                "dish": ["dish1"],
-                "oven": ["oven1"],
-                "food": list(self.movables.keys()),
+                "region": [*list(self.regions.keys())],
+                "movable": [*list(self.movables.keys())],
             }            
         self.world.set_view(eye_point=[1.2,-0.2,0.7])
         self.world.wait_for_rest()
@@ -153,7 +151,9 @@ class ProblemKitchen(TAMPProblem):
             sssp = get_sssp(body)
             self.regions[name] = Region.from_body(body, name, sssp)
         
-        self.placeables = self.regions
+        self.placeables = {}
+        self.placeables.update(self.regions)
+        self.placeables.update(self.movables)
         
         self.robots = {}
         for name, robot in robots.items():
@@ -161,13 +161,22 @@ class ProblemKitchen(TAMPProblem):
 
     def set_init_goal(self):
         # set by parent class
-        foods = list(self.movables.keys())
         hand_clean = ("handempty",)
-        attached_dish = [("attached", box, "dish1") for box in foods]
+        attached = []
+        cleared_objects = [*self.movables.keys()]
+        for movable_name, movable in self.movables.items():
+            for placeable_name, placeable in self.placeables.items():
+                if self.is_placed(movable, placeable):
+                    attached.append(("attached", movable_name, placeable_name))
+                    if placeable_name in cleared_objects:
+                        cleared_objects.remove(placeable_name)
+        
+        cleared = [("clear", movable) for movable in cleared_objects]
         # tuple: abstract variable, att: mode variable 
         abs_var_init = [
             hand_clean,
-            *attached_dish
+            *attached,
+            *cleared
         ]
         atts_init = self.get_attachments_from_scene()
         q_init = self.get_config()
@@ -182,12 +191,16 @@ class ProblemKitchen(TAMPProblem):
         assert set(self.movables.keys()) == set([att.obj_name for att in init_atts])
         self.mode_init = Mode.from_list(init_atts)
 
-        cooked = []
-        for box_num in self.goal_box_list:
-            assert f"box{box_num}" in foods
-            cooked.append(("cooked", f"box{box_num}"))
+        # GOAL
+        goal = []
+        movables = [f"block{i+1}" for i in range(self.num_box)]
+        for i in range(len(movables)-1):
+            block_name = movables[i]
+            block_parent = movables[i+1]
+            goal.append(("attached", f"{block_name}", f"{block_parent}"))
+        goal.append(("attached", f"{block_parent}", f"plate1")) # the tower is placed on the middle plate
         abs_var_goal = [ #and
-            *cooked,
+            *goal,
             *hand_clean
         ]
         self.atts_goal = {}
@@ -208,9 +221,7 @@ class ProblemKitchen(TAMPProblem):
                     placement = self.calculate_current_placement_from_scene(movable_name, placeable_name, sop)
                     att_list.append(placement)
         return att_list
-        
-
 
 if __name__ == "__main__":
-    pass
+    prob = ProblemBlocktower(gui=True, num_box=5)
     
