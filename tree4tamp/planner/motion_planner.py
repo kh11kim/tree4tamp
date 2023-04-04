@@ -71,6 +71,13 @@ class MotionPlanner:
     def rrt_connect(self, q_init:Config, q_goal:Config, mode:Mode):
         node_init = RRTNode.from_config(q_init)
         node_goal = RRTNode.from_config(q_goal)
+<<<<<<< HEAD
+=======
+
+        # if self.problem.is_collision(mode, node_init) or \
+        #    self.problem.is_collision(mode, node_goal): 
+        #    return None
+>>>>>>> 4dd2adbf5d7b92e22c8269a97a169711d37fbada
         
         # first, check direct path
         path = self.get_direct_path(node_init, node_goal, mode, partial=False)
