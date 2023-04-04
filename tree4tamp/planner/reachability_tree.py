@@ -11,30 +11,29 @@ class RTNode:
         self, 
         abs_state:frozenset,
         mode: Mode, #Dict[str, Attachment], 
-        q:Config, 
-        # traj_switch: List[Config]=None
+        q:Config
     ):
         self.s = abs_state
         self.mode = mode
         self.q = q
-        
+        self.grasp_pose = {}
+        self.approach_traj = None
+        self.q_grasp = None
         self.index: int = -1
         self.parent: RTNode = None
-        
-        # self.traj_switch = traj_switch
 
     def unpack(self):
         return self.s, self.mode, self.q
 
-    # def copy(self):
-    #     q = deepcopy(self.q)
-    #     sigma = deepcopy(self.sigma)
-    #     state = deepcopy(self.state)
-    #     self.abs_state_node
-    #     node = RGNode(state, sigma, q)
-    #     node.abs_state_node = self.abs_state_node
-    #     return node
+    def set_q_grasp(self, q_grasp, grasp_robot_name):
+        self.q_grasp = q_grasp
+        self.grasp_robot_name = grasp_robot_name
 
+    def set_grasp_pose(self, grasp_pose, robot_name):
+        self.grasp_pose[robot_name] = grasp_pose
+    
+    def set_approach_traj(self, traj):
+        self.approach_traj = traj
 
 @dataclass
 class RTEdge:
@@ -99,10 +98,6 @@ class ART:
     @property
     def root(self):
         return self.V[0]
-    
-    # def add_node(self, node:ARTNode):
-    #     node.index = len(self.V)
-    #     self.V.append(node)
 
     def add_child(self, parent:ARTNode, child:ARTNode, action:Operator):
         assert parent.index != -1

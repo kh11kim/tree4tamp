@@ -23,7 +23,7 @@ class TAMPProblem:
         self.robots: Dict[str, Robot] = {}
         self.envs: Dict[str, Body] = {}
         self.q_goal = None
-        self.atts_goal = None
+        self.atts_goal: Dict[str, Attachment] = {}
 
         # geometry world
         self.world = BulletWorld(gui=gui)
@@ -34,22 +34,11 @@ class TAMPProblem:
         self.set_task_scene()
         self.set_tamp_object_config(self.movables, self.regions, self.robots)
         self.set_init_goal()
-        self.set_init_geometry_from_scene()
+        #self.set_init_geometry_from_scene()
         self.set_task_domain_problem(domain_pddl_path)
 
         Config.set_robot_names(list(self.robots.keys()))
-
-        
-        #self.set_objects()
-
-        # #self.checker = Checker(not gui)
-        
-        # self.init_state = None
-        #self.init_state = self.save()
-        # self.set_tamp_objects(movables, regions, robots)
-                
-        # with open(self.domain_pddl_path, "r") as f:
-        #     self.domain_pddl_string = f.read()
+        Mode.set_movable_names(list(self.movables.keys()))
 
     @property
     def objects(self)->Dict[str, TAMPObject]:
@@ -91,21 +80,6 @@ class TAMPProblem:
         self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
         self.task = _ground(self.pddl_problem)
         self.abs_state_init = deepcopy(self.task.initial_state)
-
-    # def set_tamp_objects(self, movables: Dict, regions: Dict, robots: Dict):
-    #     self.movables = None
-    #     self.regions = None
-    #     self.robots = None
-    #     raise NotImplementedError()
-    
-    # def save(self):
-    #     return self.world.save_state()
-    
-    # def restore(self, bullet_state):
-    #     self.world.restore_state(bullet_state)
-
-    # def reset(self):
-    #     self.world.restore_state(self.init_state)
     
     #------------------------------------------
     # Geometry Assignment and Collision Check
@@ -146,7 +120,6 @@ class TAMPProblem:
 
     def mode_assign(self, mode:Mode):
         def has_cycle(parents):
-            visited = set()
             def dfs(node):
                 if node in visited: return True
                 
@@ -159,6 +132,7 @@ class TAMPProblem:
                 return False
 
             for node in parents.keys():
+                visited = set()
                 if node not in visited:
                     if dfs(node):
                         return True
@@ -316,16 +290,18 @@ class TAMPProblem:
         return placement
 
     def sample_transition(self, mode:Mode, q:Config, mode_new:Mode):
-        q_new = deepcopy(q)
+        q_pre = deepcopy(q)
+        q_grasp = deepcopy(q)
         for m in self.movables.keys():
             if mode.atts[m].att_type != mode_new.atts[m].att_type: #TODO: considering handover
                 if isinstance(mode.atts[m], Grasp):
                     grasp, placement = mode.atts[m], mode_new.atts[m]
                 else:
                     placement, grasp = mode.atts[m], mode_new.atts[m]
-        q_pre_ik, grasp_pose = self.get_ik(grasp, placement, grasp.parent_name, mode)
-        q_new.set_joints(grasp.parent_name, q_pre_ik)
-        return q_new, grasp_pose
+        q_pre_ik, q_ik = self.get_ik(grasp, placement, grasp.parent_name, mode)
+        q_pre.set_joints(grasp.parent_name, q_pre_ik)
+        q_grasp.set_joints(grasp.parent_name, q_ik)
+        return q_pre, q_grasp, grasp.parent_name
 
     def get_ik(
         self, grasp: Grasp, placement: Placement, robot_name:str, mode:Mode, 
@@ -344,7 +320,7 @@ class TAMPProblem:
         if q_pre_ik is None: return None
         q_ik = robot.inverse_kinematics(pose=grasp_pose)
         if q_ik is None: return None
-        return q_pre_ik, grasp_pose
+        return q_pre_ik, q_ik
     
     def generate_pddl_problem_as_string(self):
         def addline(pddl, fact):
@@ -372,125 +348,3 @@ class TAMPProblem:
         pddl += "  ))\n"
         pddl += ")\n"
         return pddl
-
-    # def is_collision_between_pgp(
-    #     self, p1:Placement, g1:Grasp, p2:Placement):
-    #     # def get_obj_pose_by_placement(p:Placement):
-    #     #     parent_name = p.parent_name
-    #     #     assert parent_name in self.regions
-    #     #     parent_pose = self.regions[parent_name].get_base_pose()
-    #     #     return parent_pose * p.tf.inverse()
-    #     obj1 = self.movables[p1.obj_name]
-    #     obj2 = self.movables[p2.obj_name]
-    #     # obj_pose1 = get_obj_pose_by_placement(p1)
-    #     # obj_pose2 = get_obj_pose_by_placement(p2)
-    #     grasp_pose = p1.obj_pose*g1.tf
-    #     obj1.set_base_pose(p1.obj_pose)
-    #     obj2.set_base_pose(p2.obj_pose)
-    #     self.hand.reset(grasp_pose)
-    #     if self.world.is_body_pairwise_collision(
-    #         body="hand", obstacles=[obj2]):
-    #         self.hand.remove()
-    #         return True
-    #     self.hand.remove()
-    #     return False
-
-    # def is_collision_between_two_placement(
-    #     self, p1:Placement, p2:Placement, robot_name=None):
-    #     # def get_obj_pose_by_placement(p:Placement):
-    #     #     parent_name = p.parent_name
-    #     #     assert parent_name in self.regions
-    #     #     if parent_name in self.regions:
-    #     #         parent_pose = self.regions[parent_name].get_base_pose()
-    #     #     else:
-    #     #         parent_pose = get_obj_pose_by_placement()
-    #     #     return parent_pose * p.tf.inverse()
-        
-    #     obj1 = self.movables[p1.obj_name]
-    #     obj2 = self.movables[p2.obj_name]
-    #     obj_pose1 = p1.obj_pose
-    #     obj_pose2 = p2.obj_pose
-    #     obj1.set_base_pose(obj_pose1)
-    #     obj2.set_base_pose(obj_pose2)
-
-    #     if self.world.is_body_pairwise_collision(
-    #         body=obj1, obstacles=[obj2]):
-    #         return True
-    #     if robot_name is not None:
-    #         robot = self.robots[robot_name]
-    #         for obj in [obj1, obj2]:
-    #             if self.world.is_body_pairwise_collision(
-    #                 body=robot, obstacles=[obj]):
-    #                 return True
-    #     return False
-
-    # def heuristic_distance(self, att1:Attachment, att2:Attachment):
-    #     if isinstance(att1, Grasp) and isinstance(att2, Grasp):
-    #         p1 = (att1.tf * Pose(trans=[0,0,-1])).trans
-    #         p2 = (att2.tf * Pose(trans=[0,0,-1])).trans
-    #         return np.linalg.norm(p2 - p1)/2
-    #     elif isinstance(att1, Placement) and isinstance(att2, Placement):
-    #         support = self.objects[att1.parent_name]
-    #         delta = att2.point - att1.point
-    #         sssp = support.sssp
-    #         x_scale, y_scale = (sssp.upper - sssp.lower)[:2]
-    #         return np.linalg.norm([delta[0]/x_scale, delta[1]/y_scale])
-    
-    
-
-# class TAMPProblem:
-    # def __init__(self, prob_name:str, scene: TAMPDomain):
-    #     self.scene = scene
-    #     self.prob_name = prob_name
-    #     self.set_objects()
-    #     self.set_init_mode_config()
-    #     self.set_init_goal()
-
-    
-    
-    # def set_init_mode_config(self):
-    #     # set initial mode of the problem
-    #     self.init_mode = None
-    #     raise NotImplementedError()
-    
-    # def set_objects(self):
-    #     self.objects = None
-    #     raise NotImplementedError()
-    
-
-
-    # def set_init_mode_config(self):
-    #     raise NotImplementedError()
-
-    
-
-    # def get_prob_pddl(self, shuffle=False):
-    #     n = "\n"
-    #     object_dict = deepcopy(self.objects)
-    #     init = deepcopy(self.init)
-    #     goal = deepcopy(self.goal)
-    #     if shuffle:
-    #         for obj_list in object_dict.values():
-    #             np.random.shuffle(obj_list)
-    #         np.random.shuffle(init)
-    #         np.random.shuffle(goal)
-            
-    #     obj_string = "\n".join([" ".join(objs) + f" - {t}" for t, objs in object_dict.items()])
-    #     init_string = "\n".join(["("+" ".join(pred)+")" if type(pred) is tuple else "("+pred+")" for pred in init])
-    #     goal_string = "\n".join(["("+" ".join(pred)+")" if type(pred) is tuple else "("+pred+")" for pred in goal])
-    #     pddl_string = f"(define {n}(problem {self.prob_name}){n}(:domain {self.scene.domain_name}){n}(:objects {n}{obj_string}){n}(:init {n}{init_string}){n}(:goal {n}(and {n}{goal_string})))"
-    #     return pddl_string
-    
-    # def make_temp_pddl_files(self, path="./temp_pddl", shuffle=False):
-    #     if os.path.exists(path):
-    #         shutil.rmtree(path)
-    #     os.mkdir(path)
-    #     domain_file_path = path + "/domain.pddl"
-    #     problem_file_path = path + "/problem.pddl"
-    #     with open(domain_file_path, "w") as f:
-    #         f.write(self.domain.domain_pddl_string)
-    #     with open(path+"/problem.pddl", "w") as f:
-    #         f.write(self.get_prob_pddl(shuffle=shuffle))
-    #     return domain_file_path, problem_file_path
-
-    

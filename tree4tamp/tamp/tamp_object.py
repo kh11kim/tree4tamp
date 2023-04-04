@@ -111,6 +111,7 @@ class Placement(Attachment):
             parent_name=placeable_name)
 
 class Mode:
+    movable_names = []
     """ All attachments of movables"""
     def __init__(self, atts: Dict[str, Attachment]):
         self.atts: Dict[str, Attachment] = atts
@@ -122,6 +123,10 @@ class Mode:
         mode_new.atts[att.obj_name] = att
         return mode_new
         #self.mode_key = self.get_mode_key(self.attachments)
+    
+    @classmethod
+    def set_movable_names(cls, name_list):
+        cls.movable_names = name_list
 
     @classmethod
     def from_list(cls, atts_list:List[Attachment]):

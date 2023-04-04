@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from sympy import re
+#from sympy import re
 from .reachability_tree import ART, ARTNode
 from typing import Iterable, TypeVar, Union, List
 from pyperplan.task import Operator, Task
@@ -20,17 +20,11 @@ class TaskPlanner:
     def __init__(
         self,
         task,
-        planner="wastar",
-        heuristic="hff",
-        p_terminal=0.005,
-        eps=0.5
+        eps,
+        planner,
+        heuristic,
+        p_terminal=0.05,
     ):
-        # parser = Parser(pddl_dom_path)
-        # parser.probInput = pddl_prob_str
-        # self.pddl_domain = parser.parse_domain()
-        # self.pddl_problem = parser.parse_problem(self.pddl_domain, read_from_file=False)
-        # self.task = _ground(self.pddl_problem)
-        # self.abs_state_init = self.task.initial_state
         self.task = task
         self.search = SEARCHES[planner]
         self.heuristic = HEURISTICS[heuristic](task)
@@ -47,6 +41,9 @@ class TaskPlanner:
     def get_plan_from_state(self, state:frozenset=None):
         """Symbolic Planner
         """
+        if isinstance(state, ARTNode):
+            state = state.abs_state
+        assert isinstance(state, frozenset)
         if state is None:
             self.task.initial_state = self.abs_state_init
         else:
